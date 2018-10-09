@@ -1,0 +1,10 @@
+fa57a1d4e61c102b59c7f3599976fb68 *docker-registry-artifact-plugin-1.0.0-3.jar
+2dd206a59938aaa1813e6e4e844ccd96 *github-oauth-authorization-plugin-2.1.0-15.jar
+38a097f5c1901145d788ec7c2c1c9f6b *kubernetes-elastic-agent-1.0.1-107.jar
+6d7fda78581a298ca53b457057a15233 *s3fetch-assembly-v5.1.0.jar
+9685c02177c57e97e0b87ee04e3975df *s3material-assembly-v5.1.0.jar
+bfd7292390192d58508764f60bcea8ea *s3publish-assembly-v5.1.0.jar
+6b87d6282bf3f15a7fc5221c81953d19 *github-pr-poller-1.3.5.jar
+aae46eae387feda57f2ffd1a05b90292 *github-pr-status-1.4.jar
+7a1b5afe6f3d4cfec651134c8348b22c *script-executor-0.3.0.jar
+923a23c9e4115ff010789a37c15aebbf *yaml-config-plugin-0.6.2.jar

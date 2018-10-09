@@ -1,0 +1,9 @@
+# Folder
+
+.idea
+
+# File
+
+.localized
+.DS_Store
+orchestrator/private-registry-secret.yaml

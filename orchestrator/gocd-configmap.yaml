@@ -1,0 +1,138 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gocd-cm
+  labels:
+    app: gocd
+    reason: ci
+data:
+  prepare.sh: |-
+    #!/bin/bash
+
+    KUBE_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+
+    while true; do
+      status_code=$(curl 'http://localhost:8153/go/api/v1/health' -o /dev/null -w "%{http_code}")
+      if [ $status_code == 200 ]; then
+        break
+      fi
+      sleep 5
+    done
+
+    set -e
+
+    echo "Checking if server has already been configured" >> /godata/logs/prepare.log
+    if [ -f /godata/logs/settings_applied.log ]; then
+      echo "Existing server configuration found in cruise-config.xml. Skipping prepare scripts." >> /godata/logs/prepare.log
+      exit 0
+    fi
+
+    echo "No configuration found in cruise-config.xml. Using default prepare scripts to configure server" >> /godata/logs/prepare.log
+    echo "Trying to create an elastic profile now." >> /godata/logs/prepare.log
+
+    (curl --fail -i 'http://localhost:8153/go/api/elastic/profiles' \
+      -H 'Accept: application/vnd.go.cd.v1+json' \
+      -H 'Content-Type: application/json' \
+      -X POST -d '{
+        "id": "android-agent",
+        "plugin_id": "cd.go.contrib.elasticagent.kubernetes",
+        "properties": [
+          {
+            "key": "Image",
+            "value": "poc-gocd-agent-android:1.0.0"
+          },
+          {
+            "key": "PodConfiguration",
+            "value": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: pod-name-prefix-{\{ POD_POSTFIX }\}\n  labels:\n    app: web\nspec:\n  containers:\n    - name: gocd-agent-container-{\{ CONTAINER_POSTFIX }\}\n      image: {\{ GOCD_AGENT_IMAGE }\}:{\{ LATEST_VERSION }\}\n      securityContext:\n        privileged: true"
+          },
+          {
+            "key": "SpecifiedUsingPodConfiguration",
+            "value": "false"
+          },
+          {
+            "key": "Privileged",
+            "value": "true"
+          }
+        ]
+      }' >> /godata/logs/prepare.log)
+
+    echo "Trying to configure plugin settings." >> /godata/logs/prepare.log
+
+    (curl --fail -i 'http://localhost:8153/go/api/admin/plugin_settings' \
+      -H 'Accept: application/vnd.go.cd.v1+json' \
+      -H 'Content-Type: application/json' \
+      -X POST -d '{
+        "plugin_id": "cd.go.contrib.elasticagent.kubernetes",
+        "configuration": [
+          {
+            "key": "go_server_url",
+            "value": "https://gocd-svc:8154/go"
+          },
+          {
+            "key": "kubernetes_cluster_url",
+            "value": "https://'$KUBERNETES_SERVICE_HOST':'$KUBERNETES_SERVICE_PORT_HTTPS'"
+          },
+          {
+            "key": "namespace",
+            "value": "default"
+          },
+          {
+            "key": "security_token",
+            "value": "'$KUBE_TOKEN'"
+          }
+        ]
+      }' >> /godata/logs/prepare.log)
+
+    echo "Trying to creating a sample pipeline." >> /godata/logs/prepare.log
+
+    (curl --fail -i 'http://localhost:8153/go/api/admin/pipelines' \
+      -H 'Accept: application/vnd.go.cd.v5+json' \
+      -H 'Content-Type: application/json' \
+      -X POST -d '{ "group": "Mobile",
+                    "pipeline": {
+                      "label_template": "${COUNT}",
+                      "name": "gzmd",
+                      "materials": [
+                        {
+                          "type": "git",
+                          "attributes": {
+                            "name": "gzmd",
+                            "branch": "master",
+                            "url": "https://github.com/hpedrorodrigues/GZMD.git",
+                            "shallow_clone": false
+                          }
+                        }
+                      ],
+                      "stages": [
+                        {
+                          "name": "Build",
+                          "jobs": [
+                            {
+                              "name": "build",
+                              "elastic_profile_id": "android-agent",
+                              "tasks": [
+                                {
+                                  "type": "exec",
+                                  "attributes": {
+                                    "command": "./gradlew",
+                                    "arguments": [
+                                      "assembleDebug"
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }' >> /godata/logs/prepare.log )
+
+    echo "Unpausing the pipeline." >> /godata/logs/prepare.log
+
+    (curl --fail -i "http://localhost:8153/go/api/pipelines/gzmd/unpause" \
+           -H 'Accept: application/vnd.go.cd.v1+json' \
+           -H 'X-GoCD-Confirm: true' \
+           -X POST >> /godata/logs/prepare.log)
+
+    echo "GoCD Server settings done" > /godata/logs/settings_applied.log

@@ -1,0 +1,15 @@
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: gocd-cluster-role-binding
+  labels:
+    app: gocd
+    reason: ci
+subjects:
+  - kind: ServiceAccount
+    name: gocd-sa
+    namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: gocd-cluster-role

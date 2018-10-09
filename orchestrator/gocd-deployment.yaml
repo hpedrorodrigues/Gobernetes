@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gocd-deployment
+  labels:
+    app: gocd
+    reason: ci
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: gocd
+      reason: ci
+  template:
+    metadata:
+      labels:
+        app: gocd
+        reason: ci
+    spec:
+      serviceAccountName: gocd-sa
+      containers:
+        - name:  gocd-server
+          image: poc-gocd-server:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8153
+            - containerPort: 8154
+          livenessProbe:
+            httpGet:
+              path: /go/api/v1/health
+              port: 8153
+            initialDelaySeconds: 90
+            periodSeconds: 15
+            failureThreshold: 10
+          readinessProbe:
+            httpGet:
+              path: /go/api/v1/health
+              port: 8153
+            initialDelaySeconds: 90
+            periodSeconds: 15
+            failureThreshold: 10
+          volumeMounts:
+            - name: configmap-volume
+              mountPath: /prepare.sh
+              subPath: prepare.sh
+          lifecycle:
+            postStart:
+              exec:
+                command: ["/bin/bash", "/prepare.sh"]
+      volumes:
+        - name: configmap-volume
+          configMap:
+            name: gocd-cm
